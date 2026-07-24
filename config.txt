@@ -18,4 +18,4 @@ TIANXING_KEY=fb794a9aad8bc627a6ce4176ffd3b8de
 TIANXING_CITY=上海松江
 
 # 天气源选择：填 hefeng 或 tianxing 二选一
-WEATHER_SOURCE=tianxing
+WEATHER_SOURCE=hefeng
