@@ -106,7 +106,8 @@ def get_hefeng_data(city_name):
 def get_tianxing_data(city_name):
     tx_key = cfg["TIANXING_KEY"]
     tx_city = cfg["TIANXING_CITY"]
-    url = f"http://api.tianapi.com/tianqi/index?key={tx_key}&city={tx_city}"
+    # 这里已经改成https新版域名
+    url = f"https://api.tianapi.com/tianqi/index?key={tx_key}&city={tx_city}"
     res = requests.get(url).json()
     if res["code"] != 200:
         print("天行天气接口报错：", res)
