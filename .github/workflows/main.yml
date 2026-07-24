@@ -1,32 +1,40 @@
 name: weixin每日推送
 on:
-  workflow_dispatch: # 手动触发
+  workflow_dispatch: # 支持页面手动一键运行
   schedule:
-    - cron: '0 4 * * *' # UTC4点=北京时间12点
+    # cron格式：分 时 日 月 周
+    # UTC 04:00 对应北京时间 12:00 中午推送
+    - cron: '0 4 * * *'
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      # 拉取仓库全部代码文件
       - name: 拉取仓库代码
         uses: actions/checkout@v4
 
+      # 搭建Python3.9运行环境
       - name: 配置Python3.9环境
         uses: actions/setup-python@v5
         with:
           python-version: "3.9"
 
+      # 设置时区为东八区上海时间
       - name: 设置上海时区
         run: echo "TZ=Asia/Shanghai" >> $GITHUB_ENV
 
+      # 更新pip并安装项目依赖
       - name: 升级pip并安装依赖
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      # 打印当前目录文件，调试config.txt是否存在
+      # 打印目录文件，调试config.txt是否存在
       - name: 打印目录文件
         run: ls -la
 
+      # 执行微信推送主脚本，注入密钥环境变量
       - name: 执行微信推送脚本
         env:
           WX_APP_ID: ${{ secrets.WX_APP_ID }}
