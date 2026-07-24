@@ -54,7 +54,7 @@ def get_token(appid, appsecret):
         sys.exit(1)
     return data["access_token"]
 
-# 农历生日倒计时计算
+# 农历生日计算剩余天数（修复重复文字）
 def get_birthday_diff(lunar_str):
     if not lunar_str:
         return ""
@@ -68,7 +68,8 @@ def get_birthday_diff(lunar_str):
         birth_next = ZhDate(this_year + 1, lm, ld)
         birth_solar_next = birth_next.to_datetime()
         diff = (birth_solar_next - today).days
-    return f"还有{diff}天"
+    # 只输出数字，去掉“还有”
+    return str(diff)
 
 # 和风天气数据源
 def get_hefeng_data(city_name):
