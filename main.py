@@ -1,3 +1,6 @@
+import os
+import sys
+import random
 import random
 from time import localtime
 from requests import get, post
