@@ -182,7 +182,60 @@ def get_weather_template(city_name):
 def send_msg(token, touser, template_id, data):
     send_url = f"https://api.weixin.qq.com/cgi-bin/message/template/send?access_token={token}"
     post = {
-        "touser": touser,
+        "touser": touser,# 组装天气、生日、纪念日全部模板数据（适配天行数据+彩色文字）
+def get_weather(city_name):
+    from datetime import datetime
+    today_date = datetime.now().strftime("%m月%d日")
+    # 相恋起始日期
+    love_start = datetime.strptime(cfg["LOVE_START_DATE"], "%Y-%m-%d")
+    love_days = (datetime.now() - love_start).days
+
+    # 读取天行实时天气
+    tx_key = cfg["TIANXING_KEY"]
+    tx_city = cfg["TIANXING_CITY"]
+    url = f"https://api.tianapi.com/tianqi/index?key={tx_key}&city={tx_city}"
+    resp = requests.get(url)
+    res = resp.json()
+    data = res["newslist"][0]
+
+    # 正确变量名，不要写 weather_text
+    weather = data["weather"]
+    temp_now = data["real"]
+    temp_min = data["lowest"]
+    temp_max = data["highest"]
+    wind_dir = data["wind"]
+    sunrise = data["sunrise"]
+    sunset = data["sunset"]
+    pm25 = data["pcpn"]
+    air_tips = data["tips"]
+
+    # 计算农历生日剩余天数
+    bir1 = get_birthday_diff(cfg.get("BIRTHDAY1_LUNAR", ""))
+    bir2 = get_birthday_diff(cfg.get("BIRTHDAY2_LUNAR", ""))
+    bir3 = get_birthday_diff(cfg.get("BIRTHDAY3_LUNAR", ""))
+
+    template_data = {
+        "date": {"value": today_date},
+        "region": {"value": city_name},
+        "weather": {"value": weather},
+        "min_temp": {"value": f"{temp_min}℃"},
+        "max_temp": {"value": f"{temp_max}℃"},
+        "temp": {"value": f"{temp_now}℃"},
+        "wind_dir": {"value": wind_dir},
+        "pm2p5": {"value": pm25},
+        "category": {"value": air_tips},
+        "sunrise": {"value": sunrise},
+        "sunset": {"value": sunset},
+        "love_day": {"value": str(love_days), "color": "#FF69B4"},
+        "birthday1": {"value": bir1, "color": "#FF69B4"},
+        "birthday2": {"value": bir2, "color": "#FF69B4"},
+        "birthday3": {"value": bir3, "color": "#FF69B4"},
+        "proposal": {"value": "今日适合出门", "color": "#FF7F50"},
+        "chp": {"value": ""},
+        "note_en": {"value": "Good day"},
+        "note_ch": {"value": "祝你今日顺利", "color": "#FF69B4"}
+    }
+    return template_data
         "template_id": template_id,
         "data": data
     }
