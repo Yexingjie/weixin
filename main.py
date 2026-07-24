@@ -4,11 +4,11 @@ import requests
 from datetime import datetime
 from zhdate import ZhDate
 
-# Windows本地运行暂停，Linux环境自动跳过
+# Windows本地运行暂停，Linux自动跳过
 if os.name == "nt":
     input("程序执行完毕，按回车键关闭窗口")
 
-# 读取config.txt配置函数
+# 读取config.txt
 def read_config():
     try:
         with open("config.txt", "r", encoding="utf-8") as f:
@@ -20,78 +20,143 @@ def read_config():
                 continue
             key, value = line.split("=", 1)
             config[key.strip()] = value.strip()
-        # 必填字段校验
-        need_keys = ["APP_ID", "APP_SECRET", "TEMPLATE_ID", "OPENID_LIST", "CITY", "LOVE_START_DATE"]
+        # 全部必填项
+        need_keys = [
+            "APP_ID", "APP_SECRET", "TEMPLATE_ID", "OPENID_LIST",
+            "CITY", "LOVE_START_DATE", "WEATHER_SOURCE",
+            "HEFENG_KEY", "HEFENG_CITY_ID",
+            "TIANXING_KEY", "TIANXING_CITY"
+        ]
         for k in need_keys:
             if k not in config or not config[k]:
-                print(f"配置文件缺少必填项：{k}")
+                print(f"配置缺失必填项：{k}")
                 sys.exit(1)
         # 拆分多用户OpenID
         config["OPENID_LIST"] = config["OPENID_LIST"].split(",")
-        print("待推送用户列表：", config["OPENID_LIST"])
+        print("推送用户列表：", config["OPENID_LIST"])
+        print("当前选用天气接口：", config["WEATHER_SOURCE"])
         return config
     except Exception as err:
-        print("读取config.txt失败：", err)
-        print("当前目录所有文件：", os.listdir("."))
+        print("读取config失败：", err)
+        print("目录文件：", os.listdir("."))
         sys.exit(1)
 
-# 加载配置
 cfg = read_config()
 
-# 获取微信access_token
+# 获取微信Token
 def get_token(appid, appsecret):
     url = f"https://api.weixin.qq.com/cgi-bin/token?grant_type=client_credential&appid={appid}&secret={appsecret}"
     res = requests.get(url)
     data = res.json()
     print("Token获取返回：", data)
     if "access_token" not in data:
-        print("access_token 获取失败！")
+        print("Token获取失败！")
         sys.exit(1)
     return data["access_token"]
 
-# 计算农历生日距离今天还有多少天
+# 农历生日倒计时计算
 def get_birthday_diff(lunar_str):
     if not lunar_str:
         return ""
-    # 解析农历生日：农历年 月 日
-    lunar_year, lunar_month, lunar_day = map(int, lunar_str.split("-"))
+    ly, lm, ld = map(int, lunar_str.split("-"))
     today = datetime.now()
     this_year = today.year
-    # 今年的农历生日转公历
-    birth_lunar = ZhDate(this_year, lunar_month, lunar_day)
+    birth_lunar = ZhDate(this_year, lm, ld)
     birth_solar = birth_lunar.to_datetime()
     diff = (birth_solar - today).days
-    # 今年生日已过，算明年
     if diff < 0:
-        birth_lunar_next = ZhDate(this_year + 1, lunar_month, lunar_day)
-        birth_solar_next = birth_lunar_next.to_datetime()
+        birth_next = ZhDate(this_year + 1, lm, ld)
+        birth_solar_next = birth_next.to_datetime()
         diff = (birth_solar_next - today).days
     return f"还有{diff}天"
 
-# 组装天气、生日、纪念日全部模板数据
-def get_weather(city_name):
-    today = datetime.now().strftime("%m月%d日")
-    # 相恋天数计算
+# 和风天气数据源
+def get_hefeng_data(city_name):
+    hf_key = cfg["HEFENG_KEY"]
+    city_id = cfg["HEFENG_CITY_ID"]
+    today_str = datetime.now().strftime("%Y%m%d")
+    # 实时天气、日出日落、空气质量
+    weather_res = requests.get(f"https://devapi.qweather.com/v7/weather/now?location={city_id}&key={hf_key}").json()
+    sun_res = requests.get(f"https://devapi.qweather.com/v7/astronomy/sun?location={city_id}&date={today_str}&key={hf_key}").json()
+    air_res = requests.get(f"https://devapi.qweather.com/v7/air/now?location={city_id}&key={hf_key}").json()
+
+    temp_now = weather_res["now"]["temp"]
+    temp_min = weather_res["now"]["tempMin"]
+    temp_max = weather_res["now"]["tempMax"]
+    weather_text = weather_res["now"]["text"]
+    wind_dir = weather_res["now"]["windDir"]
+    sunrise = sun_res["sunrise"]
+    sunset = sun_res["sunset"]
+    pm25 = air_res["now"]["pm2p5"]
+    air_level = air_res["now"]["level"]
+
+    return {
+        "temp_now": temp_now,
+        "temp_min": temp_min,
+        "temp_max": temp_max,
+        "weather_text": weather_text,
+        "wind_dir": wind_dir,
+        "sunrise": sunrise,
+        "sunset": sunset,
+        "pm25": pm25,
+        "air_level": air_level
+    }
+
+# 天行数据数据源
+def get_tianxing_data(city_name):
+    tx_key = cfg["TIANXING_KEY"]
+    tx_city = cfg["TIANXING_CITY"]
+    url = f"http://api.tianapi.com/tianqi/index?key={tx_key}&city={tx_city}"
+    res = requests.get(url).json()
+    if res["code"] != 200:
+        print("天行天气接口报错：", res)
+        sys.exit(1)
+    data = res["result"]["list"][0]
+    return {
+        "temp_now": data["temp"],
+        "temp_min": data["low"],
+        "temp_max": data["high"],
+        "weather_text": data["weather"],
+        "wind_dir": data["wind"],
+        "sunrise": data["sunrise"],
+        "sunset": data["sunset"],
+        "pm25": data["pm25"],
+        "air_level": data["airlevel"]
+    }
+
+# 统一组装模板消息数据
+def get_weather_template(city_name):
+    today_date = datetime.now().strftime("%m月%d日")
+    # 相恋天数
     love_start = datetime.strptime(cfg["LOVE_START_DATE"], "%Y-%m-%d")
     love_days = (datetime.now() - love_start).days
-
-    # 计算三个农历生日剩余天数
+    # 生日倒计时
     bir1 = get_birthday_diff(cfg.get("BIRTHDAY1_LUNAR", ""))
     bir2 = get_birthday_diff(cfg.get("BIRTHDAY2_LUNAR", ""))
     bir3 = get_birthday_diff(cfg.get("BIRTHDAY3_LUNAR", ""))
 
-    weather_info = {
-        "date": {"value": today},
+    # 根据配置选择接口
+    source = cfg["WEATHER_SOURCE"]
+    if source == "hefeng":
+        w = get_hefeng_data(city_name)
+    elif source == "tianxing":
+        w = get_tianxing_data(city_name)
+    else:
+        print("WEATHER_SOURCE 只能填 hefeng 或 tianxing")
+        sys.exit(1)
+
+    template_data = {
+        "date": {"value": today_date},
         "region": {"value": city_name},
-        "weather": {"value": "晴"},
-        "min_temp": {"value": "25℃"},
-        "max_temp": {"value": "33℃"},
-        "temp": {"value": "28℃"},
-        "wind_dir": {"value": "东南风"},
-        "pm2p5": {"value": "12"},
-        "category": {"value": "优"},
-        "sunrise": {"value": "05:10"},
-        "sunset": {"value": "19:05"},
+        "weather": {"value": w["weather_text"]},
+        "min_temp": {"value": f"{w['temp_min']}℃"},
+        "max_temp": {"value": f"{w['temp_max']}℃"},
+        "temp": {"value": f"{w['temp_now']}℃"},
+        "wind_dir": {"value": w["wind_dir"]},
+        "pm2p5": {"value": w["pm25"]},
+        "category": {"value": w["air_level"]},
+        "sunrise": {"value": w["sunrise"]},
+        "sunset": {"value": w["sunset"]},
         "love_day": {"value": str(love_days)},
         "birthday1": {"value": bir1},
         "birthday2": {"value": bir2},
@@ -101,29 +166,29 @@ def get_weather(city_name):
         "note_en": {"value": "Good day"},
         "note_ch": {"value": "祝你今日顺利"}
     }
-    return weather_info
+    return template_data
 
-# 单人推送函数
-def send_weixin_msg(token, touser, template_id, data):
+# 单用户推送
+def send_msg(token, touser, template_id, data):
     send_url = f"https://api.weixin.qq.com/cgi-bin/message/template/send?access_token={token}"
-    post_data = {
+    post = {
         "touser": touser,
         "template_id": template_id,
         "data": data
     }
-    resp = requests.post(send_url, json=post_data)
-    print(f"===== 推送用户 {touser} 返回信息 =====")
+    resp = requests.post(send_url, json=post)
+    print(f"===== 用户 {touser} 推送返回 =====")
     print(resp.json())
     return resp.json()
 
 # 主程序
 if __name__ == "__main__":
-    access_token = get_token(cfg["APP_ID"], cfg["APP_SECRET"])
-    weather_data = get_weather(cfg["CITY"])
-    # 循环给所有关注人推送
+    token = get_token(cfg["APP_ID"], cfg["APP_SECRET"])
+    template_info = get_weather_template(cfg["CITY"])
+    # 循环推送多人
     for openid in cfg["OPENID_LIST"]:
-        send_result = send_weixin_msg(access_token, openid, cfg["TEMPLATE_ID"], weather_data)
-        if send_result.get("errcode") == 0:
-            print(f"✅ 用户 {openid} 推送成功")
+        ret = send_msg(token, openid, cfg["TEMPLATE_ID"], template_info)
+        if ret.get("errcode") == 0:
+            print(f"✅ {openid} 推送成功")
         else:
-            print(f"❌ 用户 {openid} 推送失败，查看上方返回码")
+            print(f"❌ {openid} 推送失败")
