@@ -154,27 +154,29 @@ def get_weather_template(city_name):
         sys.exit(1)
 
     template_data = {
-        "date": {"value": today_date},
-        "region": {"value": city_name},
-        "weather": {"value": w["weather_text"]},
-        "min_temp": {"value": f"{w['temp_min']}℃"},
-        "max_temp": {"value": f"{w['temp_max']}℃"},
-        "temp": {"value": f"{w['temp_now']}℃"},
-        "wind_dir": {"value": w["wind_dir"]},
-        "pm2p5": {"value": w["pm25"]},
-        "category": {"value": w["air_level"]},
-        "sunrise": {"value": w["sunrise"]},
-        "sunset": {"value": w["sunset"]},
-        "love_day": {"value": str(love_days)},
-        "birthday1": {"value": bir1},
-        "birthday2": {"value": bir2},
-        "birthday3": {"value": bir3},
-        "proposal": {"value": "今日适合出门"},
-        "chp": {"value": ""},
-        "note_en": {"value": "Good day"},
-        "note_ch": {"value": "祝你今日顺利"}
-    }
-    return template_data
+    "date": {"value": today_date},
+    "region": {"value": city_name},
+    "weather": {"value": weather_text},
+    "min_temp": {"value": f"{w['temp_min']}℃"},
+    "max_temp": {"value": f"{w['temp_max']}℃"},
+    "temp": {"value": f"{w['temp_now']}℃"},
+    "wind_dir": {"value": w["wind_dir"]},
+    "pm25": {"value": w["pm25"]},
+    "category": {"value": w["air_level"]},
+    "sunrise": {"value": w["sunrise"]},
+    "sunset": {"value": w["sunset"]},
+    # 相爱天数 粉色 #FF69B4
+    "love_day": {"value": str(love_days), "color": "#FF69B4"},
+    # 生日粉色
+    "birthday1": {"value": bir1, "color": "#FF69B4"},
+    "birthday2": {"value": bir2, "color": "#FF69B4"},
+    "birthday3": {"value": bir3, "color": "#FF69B4"},
+    # 今日建议 暖橙色
+    "proposal": {"value": "今日适合出门", "color": "#FF7F50"},
+    "chp": {"value": ""},
+    "note_en": {"value": "Good day"},
+    "note_ch": {"value": "祝你今日顺利", "color": "#FF69B4"}
+}
 
 # 单用户推送
 def send_msg(token, touser, template_id, data):
