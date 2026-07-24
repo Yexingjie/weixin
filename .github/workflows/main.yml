@@ -1,42 +1,34 @@
-name: weixin每日推送
+name: weixin
 on:
-  workflow_dispatch: # 支持手动点击运行测试
-  schedule: 
-    # UTC 04:00 = 北京时间 12:00 中午推送
+  workflow_dispatch:
+  schedule:
     - cron: '0 4 * * *'
 jobs:
   build:
-    runs-on: ubuntu-latest 
+    runs-on: ubuntu-latest
     steps:
-      # 拉取仓库代码，升级v4
-      - name: Checkout code
+      - name: 拉取代码
         uses: actions/checkout@v4
-      
-      # 安装Python，升级v5，简化版本
-      - name: Set up Python 3.9
+
+      - name: 配置Python3.9
         uses: actions/setup-python@v5
         with:
           python-version: "3.9"
 
-      # 设置上海时区（简化写法）
-      - name: Set timezone Asia/Shanghai
-        run: timedatectl set-timezone Asia/Shanghai
+      # 无sudo时区方案，不会报权限错
+      - name: 设置上海时区
+        run: echo "TZ=Asia/Shanghai" >> $GITHUB_ENV
 
-      # 安装依赖
       - name: Install pip dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      # 运行推送脚本，注入仓库密钥（在GitHub仓库Secrets配置）
       - name: Run weixin send script
         env:
-          # 这里填你项目用到的所有微信密钥，去仓库Settings→Secrets添加
           WX_APP_ID: ${{ secrets.WX_APP_ID }}
-           WX_APP_SECRET: ${{ secrets.WX_APP_SECRET }}
-           TEMPLATE_ID: ${{ secrets.TEMPLATE_ID }}
-           USER_OPENID: ${{ secrets.USER_OPENID }}
-           CITY: ${{ secrets.CITY }}
-         run: python3 main.py
+          WX_APP_SECRET: ${{ secrets.WX_APP_SECRET }}
+          TEMPLATE_ID: ${{ secrets.TEMPLATE_ID }}
+          USER_OPENID: ${{ secrets.USER_OPENID }}
           CITY: ${{ secrets.CITY }}
         run: python3 main.py
