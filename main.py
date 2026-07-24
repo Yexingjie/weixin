@@ -102,15 +102,20 @@ def get_hefeng_data(city_name):
         "air_level": air_level
     }
 
-# 天行数据数据源
+# 天行数据数据源（修复key不存在崩溃、打印完整返回）
 def get_tianxing_data(city_name):
     tx_key = cfg["TIANXING_KEY"]
     tx_city = cfg["TIANXING_CITY"]
-    # 这里已经改成https新版域名
+    # 新版https域名
     url = f"https://api.tianapi.com/tianqi/index?key={tx_key}&city={tx_city}"
-    res = requests.get(url).json()
-    if res["code"] != 200:
-        print("天行天气接口报错：", res)
+    resp = requests.get(url)
+    res = resp.json()
+    # 核心打印，看天行真实返回内容
+    print("=====天行完整返回JSON=====")
+    print(res)
+    # 增加容错判断
+    if res.get("code") != 200 or "result" not in res:
+        print("❌ 天行天气接口请求失败，无法获取数据")
         sys.exit(1)
     data = res["result"]["list"][0]
     return {
