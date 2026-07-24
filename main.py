@@ -1,13 +1,33 @@
 import os
 import sys
-import random
-import random
-from time import localtime
-from requests import get, post
-from datetime import datetime, date
-from zhdate import ZhDate
-import sys
-import os
+import requests
+
+# Windows本地运行暂停，Linux自动跳过
+if os.name == "nt":
+    input("运行结束，按回车关闭窗口")
+
+# 读取配置文件函数
+def read_config():
+    try:
+        with open("config.txt", "r", encoding="utf-8") as f:
+            all_lines = f.readlines()
+        cfg_data = {}
+        for line in all_lines:
+            line = line.strip()
+            if not line or "=" not in line:
+                continue
+            k, v = line.split("=", 1)
+            cfg_data[k.strip()] = v.strip()
+        return cfg_data
+    except Exception as err:
+        print("读取config.txt失败：", err)
+        print("当前目录文件：", os.listdir("."))
+        sys.exit(1)
+
+# 加载配置
+config = read_config()
+
+# ========== 下方粘贴你原本的天气、微信推送业务代码 ==========
 
 
 def get_color():
