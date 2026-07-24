@@ -2,6 +2,7 @@ import os
 import sys
 import requests
 from datetime import datetime
+from zhdate import ZhDate
 
 # Windows本地运行暂停，Linux环境自动跳过
 if os.name == "nt":
@@ -19,13 +20,13 @@ def read_config():
                 continue
             key, value = line.split("=", 1)
             config[key.strip()] = value.strip()
-        # 更新必填字段，新增OPENID_LIST
+        # 必填字段校验
         need_keys = ["APP_ID", "APP_SECRET", "TEMPLATE_ID", "OPENID_LIST", "CITY", "LOVE_START_DATE"]
         for k in need_keys:
             if k not in config or not config[k]:
                 print(f"配置文件缺少必填项：{k}")
                 sys.exit(1)
-        # 把OpenID字符串分割成列表
+        # 拆分多用户OpenID
         config["OPENID_LIST"] = config["OPENID_LIST"].split(",")
         print("待推送用户列表：", config["OPENID_LIST"])
         return config
@@ -34,10 +35,10 @@ def read_config():
         print("当前目录所有文件：", os.listdir("."))
         sys.exit(1)
 
-# 加载配置文件
+# 加载配置
 cfg = read_config()
 
-# 获取微信access_token（只获取一次，复用给所有人）
+# 获取微信access_token
 def get_token(appid, appsecret):
     url = f"https://api.weixin.qq.com/cgi-bin/token?grant_type=client_credential&appid={appid}&secret={appsecret}"
     res = requests.get(url)
@@ -48,11 +49,36 @@ def get_token(appid, appsecret):
         sys.exit(1)
     return data["access_token"]
 
-# 获取天气数据
+# 计算农历生日距离今天还有多少天
+def get_birthday_diff(lunar_str):
+    if not lunar_str:
+        return ""
+    # 解析农历生日：农历年 月 日
+    lunar_year, lunar_month, lunar_day = map(int, lunar_str.split("-"))
+    today = datetime.now()
+    this_year = today.year
+    # 今年的农历生日转公历
+    birth_lunar = ZhDate(this_year, lunar_month, lunar_day)
+    birth_solar = birth_lunar.to_datetime()
+    diff = (birth_solar - today).days
+    # 今年生日已过，算明年
+    if diff < 0:
+        birth_lunar_next = ZhDate(this_year + 1, lunar_month, lunar_day)
+        birth_solar_next = birth_lunar_next.to_datetime()
+        diff = (birth_solar_next - today).days
+    return f"还有{diff}天"
+
+# 组装天气、生日、纪念日全部模板数据
 def get_weather(city_name):
     today = datetime.now().strftime("%m月%d日")
+    # 相恋天数计算
     love_start = datetime.strptime(cfg["LOVE_START_DATE"], "%Y-%m-%d")
     love_days = (datetime.now() - love_start).days
+
+    # 计算三个农历生日剩余天数
+    bir1 = get_birthday_diff(cfg.get("BIRTHDAY1_LUNAR", ""))
+    bir2 = get_birthday_diff(cfg.get("BIRTHDAY2_LUNAR", ""))
+    bir3 = get_birthday_diff(cfg.get("BIRTHDAY3_LUNAR", ""))
 
     weather_info = {
         "date": {"value": today},
@@ -67,9 +93,9 @@ def get_weather(city_name):
         "sunrise": {"value": "05:10"},
         "sunset": {"value": "19:05"},
         "love_day": {"value": str(love_days)},
-        "birthday1": {"value": cfg.get("BIRTHDAY1", "")},
-        "birthday2": {"value": cfg.get("BIRTHDAY2", "")},
-        "birthday3": {"value": cfg.get("BIRTHDAY3", "")},
+        "birthday1": {"value": bir1},
+        "birthday2": {"value": bir2},
+        "birthday3": {"value": bir3},
         "proposal": {"value": "今日适合出门"},
         "chp": {"value": ""},
         "note_en": {"value": "Good day"},
@@ -77,7 +103,7 @@ def get_weather(city_name):
     }
     return weather_info
 
-# 单人发送函数
+# 单人推送函数
 def send_weixin_msg(token, touser, template_id, data):
     send_url = f"https://api.weixin.qq.com/cgi-bin/message/template/send?access_token={token}"
     post_data = {
@@ -90,13 +116,11 @@ def send_weixin_msg(token, touser, template_id, data):
     print(resp.json())
     return resp.json()
 
-# 主程序入口
+# 主程序
 if __name__ == "__main__":
-    # 1. 获取token（全局只用一次）
     access_token = get_token(cfg["APP_ID"], cfg["APP_SECRET"])
-    # 2. 获取天气模板数据（所有人共用一套内容）
     weather_data = get_weather(cfg["CITY"])
-    # 3. 循环遍历所有用户，逐个发送
+    # 循环给所有关注人推送
     for openid in cfg["OPENID_LIST"]:
         send_result = send_weixin_msg(access_token, openid, cfg["TEMPLATE_ID"], weather_data)
         if send_result.get("errcode") == 0:
