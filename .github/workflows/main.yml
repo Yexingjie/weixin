@@ -1,8 +1,9 @@
 name: weixin每日推送
 on:
-  workflow_dispatch:
+  workflow_dispatch: # 手动触发
   schedule:
-    - cron: '0 4 * * *'
+    # UTC 0点 = 北京时间早上8点推送
+    - cron: '0 0 * * *'
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -23,14 +24,8 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: 打印目录文件
+      - name: 打印目录文件（确认config.txt存在）
         run: ls -la
 
       - name: 执行微信推送脚本
-        env:
-          WX_APP_ID: ${{ secrets.WX_APP_ID }}
-          WX_APP_SECRET: ${{ secrets.WX_APP_SECRET }}
-          TEMPLATE_ID: ${{ secrets.TEMPLATE_ID }}
-          USER_OPENID: ${{ secrets.USER_OPENID }}
-          CITY: ${{ secrets.CITY }}
         run: python3 main.py
