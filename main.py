@@ -102,7 +102,7 @@ def get_hefeng_data(city_name):
         "air_level": air_level
     }
 
-# 天行数据数据源（修复key不存在崩溃、打印完整返回）
+# 天行数据数据源（修复键名判断错误）
 def get_tianxing_data(city_name):
     tx_key = cfg["TIANXING_KEY"]
     tx_city = cfg["TIANXING_CITY"]
@@ -110,24 +110,25 @@ def get_tianxing_data(city_name):
     url = f"https://api.tianapi.com/tianqi/index?key={tx_key}&city={tx_city}"
     resp = requests.get(url)
     res = resp.json()
-    # 核心打印，看天行真实返回内容
+    # 打印完整返回日志
     print("=====天行完整返回JSON=====")
     print(res)
-    # 增加容错判断
-    if res.get("code") != 200 or "result" not in res:
+    # 修正判断：天行外层是 newslist，不是 result
+    if res.get("code") != 200 or "newslist" not in res:
         print("❌ 天行天气接口请求失败，无法获取数据")
         sys.exit(1)
-    data = res["result"]["list"][0]
+    # 取今日第一条数据 newslist[0]
+    data = res["newslist"][0]
     return {
-        "temp_now": data["temp"],
-        "temp_min": data["low"],
-        "temp_max": data["high"],
+        "temp_now": data["real"],
+        "temp_min": data["lowest"],
+        "temp_max": data["highest"],
         "weather_text": data["weather"],
         "wind_dir": data["wind"],
         "sunrise": data["sunrise"],
         "sunset": data["sunset"],
-        "pm25": data["pm25"],
-        "air_level": data["airlevel"]
+        "pm25": data["pcpn"],
+        "air_level": data["tips"]
     }
 
 # 统一组装模板消息数据
