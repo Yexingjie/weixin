@@ -49,20 +49,24 @@ def get_token(appid, appsecret):
         sys.exit(1)
     return data["access_token"]
 
-# 农历生日计算剩余天数
+# 农历生日计算剩余天数（修复变量未定义报错）
 def get_birthday_diff(lunar_str):
     if not lunar_str:
         return ""
+    # 拆分农历年月日，变量为 ly(年)、lm(月)、ld(日)
     ly, lm, ld = map(int, lunar_str.split("-"))
     today = datetime.now()
     this_year = today.year
-    birth_lunar = ZhDate(this_year, lunar_month, lunar_day)
+    # 构造今年农历生日
+    birth_lunar = ZhDate(this_year, lm, ld)
     birth_solar = birth_lunar.to_datetime()
     diff = (birth_solar - today).days
+    # 今年生日已过，计算明年
     if diff < 0:
-        birth_next = ZhDate(this_year + 1, lunar_month, lunar_day)
-        birth_solar_next = birth_next.to_datetime()
+        birth_lunar_next = ZhDate(this_year + 1, lm, ld)
+        birth_solar_next = birth_lunar_next.to_datetime()
         diff = (birth_solar_next - today).days
+    # 只返回数字，避免模板文字重复
     return str(diff)
 
 # 和风天气数据源
